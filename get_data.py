@@ -91,7 +91,6 @@ for i in range(number_simulations):
         dataset_by_simulation = pd.concat([df_aux_all_frames, final_sim_dataframe], axis=1)
 
         dataset = pd.concat([dataset, dataset_by_simulation], axis=0)
-        print(f'sim{i}')
 
 dataset.reset_index(inplace=True, drop=True)
 dataset.to_csv('dataset.csv', index=False)
