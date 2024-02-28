@@ -1,4 +1,4 @@
- import meshio
+import meshio
 import trimesh
 import argparse
 import numpy as np
@@ -8,7 +8,7 @@ from scipy.interpolate import splprep, splev
 
 from rbfwarp import rbfwarp3d
 
-# define new coordinates for the moving nodes according to the diameter 
+# define new coordinates for the moving nodes according to the diameter
 
 def select_diameter(points, diameter_name, new_distance, node_1, node_2, pd, pos1, pos2):
     """
@@ -87,8 +87,8 @@ def plot(mesh, mesh1, moving_nodes, new_points, mesh2, ID_moving_nodes):
     # morphed mesh
     ax = fig.add_subplot(1, 2, 2, projection='3d')
 
-    ID_sorted = [ID_moving_nodes[8], ID_moving_nodes[4], ID_moving_nodes[0], ID_moving_nodes[5], ID_moving_nodes[3], ID_moving_nodes[1], ID_moving_nodes[2], ID_moving_nodes[9]]
-    moving_nodes_sorted = points[ID_sorted, :]
+    ID_sorted = [ID_moving_nodes[0],ID_moving_nodes[2], ID_moving_nodes[3], ID_moving_nodes[1]]
+    moving_nodes_sorted = complete_mesh[ID_sorted, :]
 
     # Generate a spline representation of the curve
     tck, u = splprep([moving_nodes_sorted[:, 0], moving_nodes_sorted[:, 1], moving_nodes_sorted[:, 2]], s=1, per=False)  # todo: check it out
@@ -97,8 +97,8 @@ def plot(mesh, mesh1, moving_nodes, new_points, mesh2, ID_moving_nodes):
     ax.plot(x_new, y_new, z_new, color='red')
 
     # Points of the interspinous distance
-    is_nodes = [ID_moving_nodes[6], ID_moving_nodes[7]]
-    is_nodes = points[is_nodes, :]
+    is_nodes = [ID_moving_nodes[4], ID_moving_nodes[5]]
+    is_nodes = complete_mesh[is_nodes, :]
     ax.scatter(is_nodes[:, 0], is_nodes[:, 1], is_nodes[:, 2], c=color_points, s=point_size, alpha=point_transparency)
 
     # Morphed mesh plot
@@ -113,64 +113,59 @@ def plot(mesh, mesh1, moving_nodes, new_points, mesh2, ID_moving_nodes):
 
 if __name__ == '__main__':
 
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-AP", "--diam_AP", type=float, required=True,
-                    help="AP diameter")
-    ap.add_argument("-T", "--diam_T", type=float, required=True,
-                    help="T diameter")
-    ap.add_argument("-IS", "--diam_IS", type=float, required=True,
-                    help="IS diameter")
-
-    args = vars(ap.parse_args())
-
     # Load the 3D mesh using meshio library
     mesh = meshio.read('muscles_info.inp')
 
-    # Convert the mesh data to a trimesh object
-    points = mesh.points
+    # Convert the mesh data to a trimesh object (for representation purposes)
+    complete_mesh = mesh.points
     cells = mesh.get_cells_type('hexahedron')
-    mesh1 = trimesh.Trimesh(vertices=points, faces=cells)
+    mesh1 = trimesh.Trimesh(vertices=complete_mesh, faces=cells)
 
-    # o número do nó tem de ser -1 do que no inp porque o python começa em 0
+    # --------------------------------------------------------------------------------------------------- #
+    # Input definitions
+
+    # Note: node number = (node number - 1) because python starts at 0
 
     # Define fixed nodes
     ID_fixed_nodes = [0, 1, 4, 5, 8, 11]
 
+    # Define moving nodes (nodes of the diameters to be changed)
     # transverse diameter
-    node_1 = 317
-    node_2 = 528
-    # anteroposterior diameter
-    node_3 = 18
-    node_4 = 541
-    # anteroposterior diameter
-    node_5 = 14
-    node_6 = 330
-    # interspinous diameter
-    node_7 = 7
-    node_8 = 12
+    node_1 = 14
+    node_2 = 18
     # transverse diameter
-    node_9 = 307
-    node_10 = 518
+    node_3 = 317
+    node_4 = 528
+    # interspinous  diameter
+    node_5 = 7
+    node_6 = 12
+    # anteroposterior diameter
+    #node_7 = 520
+    #node_8 = 541
 
-    ID_moving_nodes = [node_1, node_2, node_3, node_4, node_5, node_6, node_7, node_8, node_9, node_10]
+    # Define new diameters (distance between two defined points)
+    diameter_AP_variation = 50
+    diameter_T_variation = 45
+    diameter_IS_variation = 120
+
+    # --------------------------------------------------------------------------------------------------- #
+
+    ID_moving_nodes = [node_1, node_2, node_3, node_4, node_5, node_6]
     pos = list(range(-len(ID_moving_nodes), 0))
 
-    fixed_nodes = points[ID_fixed_nodes, :]
-    moving_nodes = points[ID_moving_nodes, :]
-    ps = np.concatenate((fixed_nodes, moving_nodes), axis=0)
-    pd = ps.copy()
+    fixed_nodes = complete_mesh[ID_fixed_nodes, :]
+    moving_nodes = complete_mesh[ID_moving_nodes, :]
+    fixed_moving_nodes = np.concatenate((fixed_nodes, moving_nodes), axis=0)
+    new_nodes = fixed_moving_nodes.copy()
 
-    diameter_AP_variation = args.get('diam_AP')
-    diameter_T_variation = args.get('diam_T')
-    diameter_IS_variation = args.get('diam_IS')
+    new_nodes = select_diameter(complete_mesh, 'T', diameter_T_variation, node_1, node_2, new_nodes, pos[0], pos[1])
+    new_nodes = select_diameter(complete_mesh, 'T', diameter_T_variation, node_3, node_4, new_nodes, pos[2], pos[3])
+    new_nodes = select_diameter(complete_mesh, 'IS', diameter_IS_variation, node_5, node_6, new_nodes, pos[4], pos[5])
+    #pd = select_diameter(points, 'AP', diameter_AP_variation, node_7, node_8, pd, pos[6], pos[7])
+    #pd = select_diameter(points, 'T', diameter_T_variation, node_9, node_10, pd, pos[8], pos[9])
 
-    pd = select_diameter(points, 'T', diameter_T_variation, node_1, node_2, pd, pos[0], pos[1])
-    pd = select_diameter(points, 'AP', diameter_AP_variation, node_3, node_4, pd, pos[2], pos[3])
-    pd = select_diameter(points, 'AP', diameter_AP_variation, node_5, node_6, pd, pos[4], pos[5])
-    pd = select_diameter(points, 'IS', diameter_IS_variation, node_7, node_8, pd, pos[6], pos[7])
-    pd = select_diameter(points, 'T', diameter_T_variation, node_9, node_10, pd, pos[8], pos[9])
+    new_points = rbfwarp3d(complete_mesh, fixed_moving_nodes, new_nodes, 'thin')
 
-    new_points = rbfwarp3d(points, ps, pd, 'thin')
     mesh2 = trimesh.Trimesh(vertices=new_points, faces=cells)
 
     plot(mesh, mesh1, moving_nodes, new_points, mesh2, ID_moving_nodes)
