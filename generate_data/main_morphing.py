@@ -6,10 +6,9 @@ import matplotlib.pyplot as plt
 from scipy.spatial.distance import pdist
 from scipy.interpolate import splprep, splev
 
-from rbfwarp import rbfwarp3d
+from utils import calculate_new_nodes, calculate_transformation_matrix
 
 # define new coordinates for the moving nodes according to the diameter
-
 def select_diameter(points, diameter_name, new_distance, node_1, node_2, pd, pos1, pos2):
     """
 
@@ -164,17 +163,18 @@ if __name__ == '__main__':
     #pd = select_diameter(points, 'AP', diameter_AP_variation, node_7, node_8, pd, pos[6], pos[7])
     #pd = select_diameter(points, 'T', diameter_T_variation, node_9, node_10, pd, pos[8], pos[9])
 
-    new_points = rbfwarp3d(complete_mesh, fixed_moving_nodes, new_nodes, 'thin')
+    transformation_matrix = calculate_transformation_matrix(fixed_moving_nodes, new_nodes)
+    morphed_mesh = calculate_new_nodes(transformation_matrix, complete_mesh, new_nodes)
 
-    mesh2 = trimesh.Trimesh(vertices=new_points, faces=cells)
+    mesh2 = trimesh.Trimesh(vertices=morphed_mesh, faces=cells)
 
-    plot(mesh, mesh1, moving_nodes, new_points, mesh2, ID_moving_nodes)
+    plot(mesh, mesh1, moving_nodes, morphed_mesh, mesh2, ID_moving_nodes)
 
     # Open INP file for writing
-    index_list = list(range(1, len(new_points)+1))
+    index_list = list(range(1, len(morphed_mesh)+1))
     with open("muscles_nodes.inp", "w") as f:
         f.write("*Node, nset=pelvic_floor_nodes\n")
-        for i, row in enumerate(new_points):
+        for i, row in enumerate(morphed_mesh):
             row_with_index = [index_list[i]] + list(row)
             row_str = ", ".join(str(val) for val in row_with_index)
             f.write(row_str + "\n")
