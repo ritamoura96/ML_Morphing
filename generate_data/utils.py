@@ -2,29 +2,14 @@ import numpy as np
 import sys
 
 
-def rbf(d, r):
-    """
-
-    :param d:
-    :param r:
-    :return:
-    """
-    ko = np.exp(-d/(r**2))
-    return ko
-
-
 def ThinPlate(ri):
-    """
-
-    :param ri:
-    :return:
-    """
-    r1i = np.where(ri == 0, sys.float_info[3], ri)  # corresponds to the smallest positive float value - same as realmin in matlab
+    # corresponds to the smallest positive float value - same as realmin in matlab
+    r1i = np.where(ri == 0, sys.float_info[3], ri)
     ko = np.multiply(ri, np.log(r1i))
     return ko
 
 
-def calculate_transformation_matrix(fixed_moving_nodes, new_nodes, method):
+def calculate_transformation_matrix(fixed_moving_nodes, new_nodes):
 
     # define length of fixed/moving nodes and new nodes
     len_new_nodes = len(new_nodes)
@@ -39,11 +24,7 @@ def calculate_transformation_matrix(fixed_moving_nodes, new_nodes, method):
         K[:, i] = np.sum(distance ** 2, axis=1)
 
     # K matrix suffers warping method - smoothed values that approximates the input values
-    if method == 'gau':
-        r = 1
-        K = rbf(K, r)
-    elif method == 'thin':
-        K = ThinPlate(K)
+    K = ThinPlate(K)
 
     # operations to obtain old nodes matrix to be used in the equation system
     P = np.insert(fixed_moving_nodes, 0, 1, axis=1)  # addition of 1's to account for translation component
@@ -61,7 +42,7 @@ def calculate_transformation_matrix(fixed_moving_nodes, new_nodes, method):
     return transformation_matrix
 
 
-def calculate_new_nodes(transformation_matrix, complete_mesh, new_nodes, method):
+def calculate_new_nodes(transformation_matrix, complete_mesh, new_nodes):
 
     len_complete_mesh = len(complete_mesh)
     len_new_nodes = len(new_nodes)
@@ -71,11 +52,7 @@ def calculate_new_nodes(transformation_matrix, complete_mesh, new_nodes, method)
         distance = complete_mesh - np.ones((len_complete_mesh, 1))*new_nodes[i, :]
         K[:, i] = np.sum(distance ** 2, axis=1)
 
-    if method == 'gau':
-        r = 1
-        K = rbf(K, r)
-    elif method == 'thin':
-        K = ThinPlate(K)
+    K = ThinPlate(K)
 
     P = np.insert(complete_mesh, 0, 1, axis=1)
     input_matrix = np.concatenate((K, P), axis=1)
@@ -83,13 +60,5 @@ def calculate_new_nodes(transformation_matrix, complete_mesh, new_nodes, method)
     output_matrix = np.matmul(input_matrix, transformation_matrix)
 
     return output_matrix
-
-
-def rbfwarp3d(complete_mesh, fixed_moving_nodes, new_nodes, method):
-
-    transformation_matrix = calculate_transformation_matrix(fixed_moving_nodes, new_nodes, method)
-    new_nodes_complete_mesh = calculate_new_nodes(transformation_matrix, complete_mesh, new_nodes, method)
-
-    return new_nodes_complete_mesh
 
 
