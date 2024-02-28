@@ -24,27 +24,52 @@ def ThinPlate(ri):
     return ko
 
 
-def calculate_w(ps, pd, method):
-    """
+def calculate_transformation_matrix(fixed_moving_nodes, new_nodes, method):
 
-    :param ps:
-    :param pd:
-    :param method:
-    :return:
-    """
+    # define length of fixed/moving nodes and new nodes
+    len_new_nodes = len(new_nodes)
+    len_fixed_moving_nodes = len(fixed_moving_nodes)
 
-    # Training 'w' with 'L'
+    # create matrix with length dimensions
+    K = np.zeros((len_new_nodes, len_fixed_moving_nodes))
 
-    num_center = len(pd)
-    nump = len(ps)
-    K = np.zeros((num_center, nump))
+    # calculate distance from moving nodes to new nodes
+    for i in range(len_new_nodes):
+        distance = fixed_moving_nodes - np.ones((len_fixed_moving_nodes, 1)) * new_nodes[i, :]
+        K[:, i] = np.sum(distance ** 2, axis=1)
 
-    for i in range(num_center):
-        # Forward warping, different from image warping
-        dx = np.tile(pd[i, :], np.ones(nump)) - ps
-        dx = np.reshape(dx, (len(pd), 3))
-        # Use |dist|^2 as input
-        K[:, i] = np.sum(dx ** 2, axis=1)
+    # K matrix suffers warping method - smoothed values that approximates the input values
+    if method == 'gau':
+        r = 1
+        K = rbf(K, r)
+    elif method == 'thin':
+        K = ThinPlate(K)
+
+    # operations to obtain old nodes matrix to be used in the equation system
+    P = np.insert(fixed_moving_nodes, 0, 1, axis=1)  # addition of 1's to account for translation component
+    L1 = np.concatenate((K, P), axis=1)
+    P_transpose = np.transpose(P)
+    L2 = np.concatenate((P_transpose, np.zeros((4, 4))), axis=1)  # include homogeneous coordinates
+    input_matrix = np.concatenate((L1, L2), axis=0)
+
+    # definition of new nodes matrix in dimensions accordingly to old nodes matrix to be used in the system
+    output_matrix = np.concatenate((new_nodes, np.zeros((4, 3))), axis=0)
+
+    # solve system of equations to obtain transformation matrix
+    transformation_matrix = np.linalg.solve(input_matrix, output_matrix)
+
+    return transformation_matrix
+
+
+def calculate_new_nodes(transformation_matrix, complete_mesh, new_nodes, method):
+
+    len_complete_mesh = len(complete_mesh)
+    len_new_nodes = len(new_nodes)
+    K = np.zeros((len_complete_mesh, len_new_nodes))
+
+    for i in range(len_new_nodes):
+        distance = complete_mesh - np.ones((len_complete_mesh, 1))*new_nodes[i, :]
+        K[:, i] = np.sum(distance ** 2, axis=1)
 
     if method == 'gau':
         r = 1
@@ -52,56 +77,19 @@ def calculate_w(ps, pd, method):
     elif method == 'thin':
         K = ThinPlate(K)
 
-    P = np.insert(ps, 0, 1, axis=1)
+    P = np.insert(complete_mesh, 0, 1, axis=1)
+    input_matrix = np.concatenate((K, P), axis=1)
 
-    L1 = np.concatenate((K, P), axis=1)
-    P_transpose = np.transpose(P)
-    L2 = np.concatenate((P_transpose, np.zeros((4, 4))), axis=1)
+    output_matrix = np.matmul(input_matrix, transformation_matrix)
 
-    L = np.concatenate((L1, L2), axis=0)
-    Y = np.concatenate((pd, np.zeros((4, 3))), axis=0)
-
-    w = np.linalg.solve(L, Y)
-
-    return w
+    return output_matrix
 
 
-def calculate_new_nodes(w, p3d, pd, method):
-    """
+def rbfwarp3d(complete_mesh, fixed_moving_nodes, new_nodes, method):
 
-    :param w:
-    :param p3d:
-    :param pd:
-    :param method:
-    :return:
-    """
+    transformation_matrix = calculate_transformation_matrix(fixed_moving_nodes, new_nodes, method)
+    new_nodes_complete_mesh = calculate_new_nodes(transformation_matrix, complete_mesh, new_nodes, method)
 
-    nump = len(p3d)
-    num_center = len(pd)
-    kp = np.zeros((nump, num_center))
-
-    for i in range(num_center):
-        dx = p3d - np.ones((nump, 1))*pd[i, :]
-        kp[:, i] = np.sum(dx ** 2, axis=1)
-
-    if method == 'gau':
-        r = 1
-        kp = rbf(kp, r)
-    elif method == 'thin':
-        kp = ThinPlate(kp)
-
-    P = np.insert(p3d, 0, 1, axis=1)
-    L = np.concatenate((kp, P), axis=1)
-    p3do = np.matmul(L, w)
-
-    return p3do
-
-
-def rbfwarp3d(p3d, ps, pd, method):
-
-    w = calculate_w(ps, pd, method)
-    new_nodes = calculate_new_nodes(w, p3d, pd, method)
-
-    return new_nodes
+    return new_nodes_complete_mesh
 
 
